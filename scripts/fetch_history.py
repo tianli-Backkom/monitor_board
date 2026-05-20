@@ -377,10 +377,10 @@ def parse_log(filepath, repo_name):
                         d = parts[0]
                         dir_counts[d] += count
 
-                dirs_sorted = sorted([(d, c) for d, c in dir_counts.items()], key=lambda x: -x[1])[:5]
+                dirs_sorted = sorted([(d, c) for d, c in dir_counts.items()], key=lambda x: -x[1])
                 comp['topDirs'] = [[d, c, dir_desc(d)] for d, c in dirs_sorted]
 
-                files_sorted = sorted(file_counts.items(), key=lambda x: -x[1])[:10]
+                files_sorted = sorted(file_counts.items(), key=lambda x: -x[1])
                 comp['topFiles'] = [[f, c] for f, c in files_sorted]
 
                 if dirs_sorted:

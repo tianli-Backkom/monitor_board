@@ -430,7 +430,7 @@ function openDetail(id) {
       '<div class="info-item"><div class="ilabel">test 目录</div><div class="ivalue">'+c.testViolations.toLocaleString()+'</div></div></div></div>';
 
     if(c.topDirs && c.topDirs.length > 0) {
-      body += '<div class="section" style="margin:20px 0;"><h3>📁 Top 违规模块</h3><div class="file-list">';
+      body += '<div class="section" style="margin:20px 0;"><h3>📁 违规模块全览 <span class="badge">'+c.topDirs.length+'</span></h3><div class="file-list">';
       body += c.topDirs.map(d =>
         '<div class="file-item"><span class="fpath">'+d[0]+' <span style="color:var(--text-dim);font-size:11px;">('+d[2]+')</span></span><span class="fcount">'+d[1].toLocaleString()+'</span></div>'
       ).join('');
@@ -438,8 +438,8 @@ function openDetail(id) {
     }
 
     if(c.topFiles && c.topFiles.length > 0) {
-      body += '<div class="section" style="margin:20px 0;"><h3>📄 Top 违规文件</h3><div class="file-list">';
-      body += c.topFiles.slice(0, 15).map(f =>
+      body += '<div class="section" style="margin:20px 0;"><h3>📄 违规文件全览 <span class="badge">'+c.topFiles.length+'</span></h3><div class="file-list">';
+      body += c.topFiles.map(f =>
         '<div class="file-item"><span class="fpath">'+f[0]+'</span><span class="fcount">'+f[1]+'</span></div>'
       ).join('');
       body += '</div></div>';
