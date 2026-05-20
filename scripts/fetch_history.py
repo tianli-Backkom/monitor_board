@@ -368,15 +368,16 @@ def parse_log(filepath, repo_name):
                 comp['testViolations'] = test_v
                 comp['samples'] = samples
 
-                # Directory aggregation
+                # Directory aggregation - only first-level directories (root modules)
                 dir_counts = defaultdict(int)
                 for fpath, count in file_counts.items():
                     parts = fpath.split('/')
-                    for i in range(1, len(parts)):
-                        d = '/'.join(parts[:i])
+                    # Only count the first level (root module directory)
+                    if len(parts) > 1:
+                        d = parts[0]
                         dir_counts[d] += count
 
-                dirs_sorted = sorted([(d, c) for d, c in dir_counts.items() if len(d) > 2], key=lambda x: -x[1])[:5]
+                dirs_sorted = sorted([(d, c) for d, c in dir_counts.items()], key=lambda x: -x[1])[:5]
                 comp['topDirs'] = [[d, c, dir_desc(d)] for d, c in dirs_sorted]
 
                 files_sorted = sorted(file_counts.items(), key=lambda x: -x[1])[:10]
