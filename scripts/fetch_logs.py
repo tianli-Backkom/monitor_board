@@ -38,6 +38,10 @@ REPO_CONFIG = {
         'base_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/OpenSourceCodeCheck/job/OmniStateStore',
         'console_suffix': 'consoleText',
     },
+    'ubs-atomic': {
+        'base_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/OpenSourceCodeCheck/job/ubs-atomic',
+        'console_suffix': 'consoleText',
+    },
 }
 
 LOGS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs')

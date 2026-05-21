@@ -45,6 +45,10 @@ REPO_CONFIG = {
         'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/OpenSourceCodeCheck/job/OmniStateStore',
         'gitcode_url': 'https://gitcode.com/openeuler/OmniStateStore',
     },
+    'ubs-atomic': {
+        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/OpenSourceCodeCheck/job/ubs-atomic',
+        'gitcode_url': 'https://gitcode.com/openeuler/ubs-atomic',
+    },
 }
 
 # Session for requests
