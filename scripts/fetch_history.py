@@ -140,7 +140,7 @@ def fetch_build_log(repo_name, build_number):
 
 
 def get_open_pr_numbers(repo_name, count=10):
-    """Get PR numbers and info of the latest open PRs from GitCode API."""
+    """Get PR numbers and info of the latest open PRs targeting master from GitCode API."""
     token = os.environ.get('GITCODE_TOKEN', '')
     if not token:
         print(f"  GITCODE_TOKEN not set, skipping open PR filter")
@@ -150,27 +150,39 @@ def get_open_pr_numbers(repo_name, count=10):
     repo = repo_name
     url = f"https://gitcode.com/api/v5/repos/{owner}/{repo}/pulls"
     try:
-        print(f"  Fetching open PRs from GitCode...")
+        print(f"  Fetching open PRs targeting master from GitCode...")
         headers = {'private-token': token}
+        # Fetch extra pages to ensure enough master-targeting PRs after filtering
         r = session.get(url, params={
             'state': 'open',
             'sort': 'updated',
             'direction': 'desc',
             'page': 1,
-            'per_page': count,
+            'per_page': min(count * 3, 50),
         }, headers=headers, timeout=30)
         r.raise_for_status()
         prs = r.json()
         pr_info = []
         for pr in prs:
-            if 'number' in pr:
-                pr_info.append({
-                    'number': int(pr['number']),
-                    'author': pr.get('author', {}).get('username', pr.get('user', {}).get('login', '-')),
-                    'title': pr.get('title', ''),
-                    'updated_at': pr.get('updated_at', ''),
-                })
-        print(f"    Got {len(pr_info)} open PRs")
+            if 'number' not in pr:
+                continue
+            # Filter: only PRs targeting master branch
+            base_ref = ''
+            if 'base' in pr:
+                if isinstance(pr['base'], dict):
+                    base_ref = pr['base'].get('ref', '')
+                else:
+                    base_ref = str(pr['base'])
+            if base_ref and base_ref != 'master':
+                continue
+            pr_info.append({
+                'number': int(pr['number']),
+                'author': pr.get('author', {}).get('username', pr.get('user', {}).get('login', '-')),
+                'title': pr.get('title', ''),
+                'updated_at': pr.get('updated_at', ''),
+                'base_ref': base_ref or 'master',
+            })
+        print(f"    Got {len(pr_info)} open PRs targeting master")
         return pr_info[:count]
     except Exception as e:
         print(f"    GitCode API error: {e}")
