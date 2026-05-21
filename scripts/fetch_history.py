@@ -14,39 +14,39 @@ LOGS_DIR = os.path.join(PROJECT_DIR, 'logs')
 # Jenkins config for each repo
 REPO_CONFIG = {
     'ubs-engine': {
-        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/OpenSourceCodeCheck/job/ubs-engine',
+        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/pre-commit/job/ubs-engine',
         'gitcode_url': 'https://gitcode.com/openeuler/ubs-engine',
     },
     'ubs-comm': {
-        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/DT/job/ubs-comm',
+        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/pre-commit/job/ubs-comm',
         'gitcode_url': 'https://gitcode.com/openeuler/ubs-comm',
     },
     'ubs-io': {
-        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/OpenSourceCodeCheck/job/ubs-io',
+        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/pre-commit/job/ubs-io',
         'gitcode_url': 'https://gitcode.com/openeuler/ubs-io',
     },
     'ubs-mem': {
-        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/OpenSourceCodeCheck/job/ubs-mem',
+        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/pre-commit/job/ubs-mem',
         'gitcode_url': 'https://gitcode.com/openeuler/ubs-mem',
     },
     'ubs-virt': {
-        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/OpenSourceCodeCheck/job/ubs-virt',
+        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/pre-commit/job/ubs-virt',
         'gitcode_url': 'https://gitcode.com/openeuler/ubs-virt',
     },
     'ubturbo': {
-        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/OpenSourceCodeCheck/job/ubturbo',
+        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/pre-commit/job/ubturbo',
         'gitcode_url': 'https://gitcode.com/openeuler/ubturbo',
     },
     'ham': {
-        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/OpenSourceCodeCheck/job/ham',
+        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/pre-commit/job/ham',
         'gitcode_url': 'https://gitcode.com/openeuler/ham',
     },
     'OmniStateStore': {
-        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/OpenSourceCodeCheck/job/OmniStateStore',
+        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/pre-commit/job/OmniStateStore',
         'gitcode_url': 'https://gitcode.com/openeuler/OmniStateStore',
     },
     'ubs-atomic': {
-        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/OpenSourceCodeCheck/job/ubs-atomic',
+        'jenkins_url': 'https://ci.openeuler.openatom.cn/job/multiarch/job/manual-jobs/job/openeuler/job/UBSCore/job/pre-commit/job/ubs-atomic',
         'gitcode_url': 'https://gitcode.com/openeuler/ubs-atomic',
     },
 }
@@ -454,7 +454,7 @@ def main():
                     'srcViolations': 0,
                     'testViolations': 0,
                     'conclusion': '该 PR 尚无 Jenkins pre-commit 检查记录',
-                    'recommendation': '等待 Jenkins OpenSourceCodeCheck 任务执行检查',
+                    'recommendation': '等待 Jenkins pre-commit 任务执行检查',
                     'topDirs': [],
                     'topFiles': [],
                     'samples': [],
