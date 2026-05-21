@@ -152,13 +152,13 @@ def get_open_pr_numbers(repo_name, count=10):
     try:
         print(f"  Fetching open PRs targeting master from GitCode...")
         headers = {'private-token': token}
-        # Fetch extra pages to ensure enough master-targeting PRs after filtering
         r = session.get(url, params={
             'state': 'open',
             'sort': 'updated',
             'direction': 'desc',
+            'base': 'master',
             'page': 1,
-            'per_page': min(count * 3, 50),
+            'per_page': count,
         }, headers=headers, timeout=30)
         r.raise_for_status()
         prs = r.json()
@@ -166,21 +166,11 @@ def get_open_pr_numbers(repo_name, count=10):
         for pr in prs:
             if 'number' not in pr:
                 continue
-            # Filter: only PRs targeting master branch
-            base_ref = ''
-            if 'base' in pr:
-                if isinstance(pr['base'], dict):
-                    base_ref = pr['base'].get('ref', '')
-                else:
-                    base_ref = str(pr['base'])
-            if base_ref and base_ref != 'master':
-                continue
             pr_info.append({
                 'number': int(pr['number']),
                 'author': pr.get('author', {}).get('username', pr.get('user', {}).get('login', '-')),
                 'title': pr.get('title', ''),
                 'updated_at': pr.get('updated_at', ''),
-                'base_ref': base_ref or 'master',
             })
         print(f"    Got {len(pr_info)} open PRs targeting master")
         return pr_info[:count]
@@ -204,6 +194,23 @@ def parse_pr_number_from_log(filepath):
         return None
 
 
+def get_target_branch_from_log(filepath):
+    """Extract target branch from Jenkins log header.
+    Pattern: PR #79 [author:src -> master] trigger by merge_request
+    Returns target branch name or empty string if not found.
+    """
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+            content = f.read(4096)  # Only need first 4KB
+
+        m = re.search(r'PR\s+#?\d+\s+\[[^\]]+?\s*(?:-&gt;|->)\s*(\S+)\]', content)
+        if m:
+            return m.group(1).strip()
+        return ''
+    except:
+        return ''
+
+
 def has_precommit_check(filepath):
     """Check if a log file contains pre-commit check execution."""
     try:
@@ -215,38 +222,42 @@ def has_precommit_check(filepath):
 
 
 def fetch_repo_history(repo_name, count=10):
-    """Fetch and parse history for a repo, filtered by open PRs.
+    """Fetch and parse history for a repo, filtered by open PRs targeting master.
 
-    Returns a list of (log_file_or_None, pr_info) tuples in GitCode open PR order.
-    If a PR has no Jenkins check data, log_file is None.
+    Returns a list of (log_file_or_None, pr_info) tuples.
+    Only PRs whose target branch is 'master' (verified from Jenkins log) are included.
     """
     print(f"\n=== Fetching history for {repo_name} ===")
 
-    # Get open PR info from GitCode
+    # Get open PR info from GitCode (API filters by state=open, base=master)
     open_pr_info = get_open_pr_numbers(repo_name, count)
     open_pr_numbers = [p['number'] for p in open_pr_info]
     open_pr_set = set(open_pr_numbers)
 
     if not open_pr_set:
-        print(f"  No open PRs found, falling back to recent builds")
-        build_numbers = get_jenkins_builds(repo_name, count + 5)
+        print(f"  No open PRs targeting master from API, falling back to recent builds")
+        build_numbers = get_jenkins_builds(repo_name, 50)
         log_files = []
-        for build_num in build_numbers[:count + 5]:
+        for build_num in build_numbers:
             log_file = fetch_build_log(repo_name, build_num)
             if log_file:
                 log_files.append(log_file)
         pr_to_build = {}
         for log_file in log_files:
             pr_num = parse_pr_number_from_log(log_file)
-            if pr_num and pr_num not in pr_to_build:
-                pr_to_build[pr_num] = log_file
-                if len(pr_to_build) >= count:
-                    break
-        print(f"  Found {len(pr_to_build)} unique PRs (fallback)")
+            if not pr_num or pr_num in pr_to_build:
+                continue
+            branch = get_target_branch_from_log(log_file)
+            if branch and branch != 'master':
+                print(f"    Skipping PR #{pr_num} (target branch: {branch})")
+                continue
+            pr_to_build[pr_num] = log_file
+            if len(pr_to_build) >= count:
+                break
+        print(f"  Found {len(pr_to_build)} unique PRs targeting master (fallback)")
         return [(lf, None) for lf in list(pr_to_build.values())[:count]]
 
     # Get recent build numbers - scan enough builds to find all open PRs
-    # Use a larger range: scan up to 100 recent builds
     build_numbers = get_jenkins_builds(repo_name, 100)
 
     # Fetch logs
@@ -257,17 +268,23 @@ def fetch_repo_history(repo_name, count=10):
             log_files.append(log_file)
 
     # Map open PR number -> best log file (prefer builds with pre-commit check results)
+    # Also verify target branch is master from log content
     pr_to_build = {}
     for log_file in log_files:
         pr_num = parse_pr_number_from_log(log_file)
-        if pr_num and pr_num in open_pr_set:
-            existing = pr_to_build.get(pr_num)
-            if existing is None:
+        if not pr_num or pr_num not in open_pr_set:
+            continue
+        # Safety check: verify target branch is master from Jenkins log
+        branch = get_target_branch_from_log(log_file)
+        if branch and branch != 'master':
+            print(f"    Skipping PR #{pr_num} (target branch: {branch}, not master)")
+            continue
+        existing = pr_to_build.get(pr_num)
+        if existing is None:
+            pr_to_build[pr_num] = log_file
+        else:
+            if has_precommit_check(log_file) and not has_precommit_check(existing):
                 pr_to_build[pr_num] = log_file
-            else:
-                # Prefer log with pre-commit check results over one without
-                if has_precommit_check(log_file) and not has_precommit_check(existing):
-                    pr_to_build[pr_num] = log_file
 
     # Build result in GitCode's open PR order
     result = []
@@ -279,7 +296,7 @@ def fetch_repo_history(repo_name, count=10):
             break
 
     matched = sum(1 for lf, _ in result if lf is not None)
-    print(f"  Found {matched}/{len(result)} open PRs with check data")
+    print(f"  Found {matched}/{len(result)} open PRs targeting master with check data")
     return result
 
 
@@ -317,7 +334,7 @@ def parse_log(filepath, repo_name):
 
     comp = {
         'id': basename, 'name': basename, 'repo': repo_name,
-        'branch': '', 'pr': '#-', 'prAuthor': '-', 'prSource': '-',
+        'branch': '', 'targetBranch': '', 'pr': '#-', 'prAuthor': '-', 'prSource': '-',
         'trigger': '-', 'buildNumber': 0,
         'status': 'skip', 'checkType': '未配置 pre-commit',
         'violations': 0, 'affectedFiles': 0,
@@ -339,6 +356,7 @@ def parse_log(filepath, repo_name):
             comp['pr'] = '#' + m.group(1)
             comp['prAuthor'] = m.group(2).strip()
             comp['prSource'] = m.group(3).strip()
+            comp['targetBranch'] = m.group(5).strip()
             comp['trigger'] = m.group(6).strip()
 
         m = re.search(r'git clone\s+-b\s+(\S+)', line)
@@ -454,6 +472,7 @@ def main():
                     'name': f'{repo}-no-build-{pr_num}',
                     'repo': repo,
                     'branch': '',
+                    'targetBranch': '',
                     'pr': f'#{pr_num}',
                     'prAuthor': pr_info.get('author', '-') if pr_info else '-',
                     'prSource': '-',
