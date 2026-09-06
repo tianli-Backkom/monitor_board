@@ -1,0 +1,1705 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pre-Commit 静态检查看板</title>
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --card-bg: #ffffff;
+    --card-hover: #f0f4f8;
+    --text: #1a2332;
+    --text-dim: #6b7a8f;
+    --border: #dce2eb;
+    --red: #e53e3e;
+    --red-bg: #fff5f5;
+    --red-light: #feb2b2;
+    --orange: #ed8936;
+    --orange-bg: #fffaf0;
+    --green: #38a169;
+    --green-bg: #f0fff4;
+    --gray: #a0aec0;
+    --gray-bg: #f7fafc;
+    --accent: #3182ce;
+    --accent-dim: #ebf4ff;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-hover: 0 4px 12px rgba(0,0,0,0.1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  .container { max-width: 1440px; margin: 0 auto; padding: 32px 24px; }
+
+  .header { margin-bottom: 28px; }
+  .header h1 { font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
+  .header h1 span { color: var(--accent); }
+  .header .sub { color: var(--text-dim); margin-top: 4px; font-size: 14px; }
+  .header .sub strong { color: var(--text); }
+
+  /* Repo tabs */
+  .repo-tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 12px; flex-wrap: wrap; }
+  .repo-tab {
+    background: transparent; border: none; border-bottom: 2px solid transparent;
+    padding: 8px 16px; font-size: 13px; cursor: pointer; color: var(--text-dim);
+    transition: all .15s; border-radius: 6px 6px 0 0;
+  }
+  .repo-tab:hover { color: var(--accent); background: var(--accent-dim); }
+  .repo-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; background: var(--accent-dim); }
+  .repo-tab .badge { margin-left: 6px; padding: 1px 6px; border-radius: 10px; font-size: 11px; background: var(--red); color: white; }
+
+  /* Latest PR card */
+  .latest-pr-card {
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 24px; margin-bottom: 24px; box-shadow: var(--shadow);
+  }
+  .latest-pr-card .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .latest-pr-card .card-title { font-size: 16px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .latest-pr-card .pr-id { font-size: 20px; font-weight: 700; color: var(--accent); }
+  .latest-pr-card .pr-id a { color: var(--accent); text-decoration: none; }
+  .latest-pr-card .pr-id a:hover { text-decoration: underline; }
+  .latest-pr-card .info-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .latest-pr-card .info-item {
+    background: var(--bg); border-radius: 8px; padding: 10px 14px; border: 1px solid var(--border);
+  }
+  .latest-pr-card .info-item .ilabel { font-size: 11px; color: var(--text-dim); }
+  .latest-pr-card .info-item .ivalue { font-size: 14px; font-weight: 600; margin-top: 2px; }
+  .latest-pr-card .info-item .ivalue.red { color: var(--red); }
+  .latest-pr-card .info-item .ivalue.green { color: var(--green); }
+  .latest-pr-card .info-item .ivalue.orange { color: var(--orange); }
+  .latest-pr-card .conclusion { margin-top: 14px; padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
+  .latest-pr-card .conclusion.fail { background: var(--red-bg); border: 1px solid var(--red-light); color: #9b2c2c; }
+  .latest-pr-card .conclusion.pass { background: var(--green-bg); border: 1px solid #9ae6b4; color: #276749; }
+  .latest-pr-card .conclusion.skip { background: var(--gray-bg); border: 1px solid #e2e8f0; color: #718096; }
+  .latest-pr-card .no-data { text-align: center; padding: 24px; color: var(--text-dim); font-size: 14px; }
+
+  .ok-card {
+    background: var(--green-bg); border: 1px solid #9ae6b4; border-radius: 12px;
+    padding: 20px; margin-bottom: 24px;
+  }
+  .ok-card h3 { font-size: 16px; color: var(--green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .ok-card p { font-size: 14px; color: #276749; }
+
+  /* Module stats */
+  .section { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: var(--shadow); }
+  .section h3 { font-size: 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .section h3 .badge { font-size: 12px; font-weight: 600; background: var(--accent-dim); color: var(--accent); padding: 2px 8px; border-radius: 10px; }
+
+  .module-list { display: flex; flex-direction: column; gap: 8px; }
+  .module-item {
+    display: flex; align-items: center; padding: 12px 16px; background: var(--bg); border-radius: 8px;
+    transition: background .15s;
+  }
+  .module-item:hover { background: var(--card-hover); }
+  .module-name { flex: 1; font-weight: 500; font-size: 14px; }
+  .module-stats { display: flex; gap: 24px; font-size: 13px; }
+  .module-stat { display: flex; align-items: center; gap: 4px; }
+  .module-stat .label { color: var(--text-dim); }
+  .module-stat .value { font-weight: 600; }
+  .module-stat .high { color: var(--red); }
+  .module-stat .mid { color: var(--orange); }
+  .priority-tag {
+    font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600;
+    margin-left: 12px;
+  }
+  .priority-p0 { background: var(--red); color: white; }
+  .priority-p1 { background: var(--orange); color: white; }
+  .priority-p2 { background: #d69e2e; color: white; }
+
+  /* PR Table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 12px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { font-weight: 600; color: var(--text-dim); font-size: 12px; text-transform: uppercase; }
+  tr:hover { background: var(--card-hover); }
+
+  .badge {
+    font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+    white-space: nowrap; border: 1px solid transparent; display: inline-block;
+  }
+  .badge.fail { background: var(--red-bg); color: #c53030; border-color: var(--red-light); }
+  .badge.pass { background: var(--green-bg); color: #276749; border-color: #9ae6b4; }
+  .badge.skip { background: var(--gray-bg); color: #718096; border-color: #e2e8f0; }
+
+  .pr-link { color: var(--accent); text-decoration: none; font-weight: 500; }
+  .pr-link:hover { text-decoration: underline; }
+
+  .violation-count { font-weight: 600; color: var(--red); }
+  .violation-count.zero { color: var(--green); }
+
+  .top-modules { font-size: 11px; color: var(--text-dim); max-width: 300px; }
+  .top-modules span { display: inline-block; background: var(--accent-dim); color: var(--accent); padding: 2px 8px; border-radius: 10px; margin: 2px; }
+
+  /* Suggestion card */
+  .suggestion-card {
+    background: var(--accent-dim); border: 1px solid #bee3f8; border-radius: 12px;
+    padding: 20px; margin-bottom: 24px;
+  }
+  .suggestion-card h3 { font-size: 16px; color: #2b6cb0; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .suggestion-card ol { padding-left: 20px; }
+  .suggestion-card li { margin: 8px 0; font-size: 14px; color: #2a4365; line-height: 1.6; }
+  .suggestion-card code { background: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+
+  /* Detail overlay */
+  .detail-overlay {
+    display: none; position: fixed; inset: 0; z-index: 100;
+    background: rgba(45,55,72,0.5); backdrop-filter: blur(4px);
+  }
+  .detail-overlay.active { display: flex; align-items: center; justify-content: center; }
+
+  .detail-panel {
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px;
+    width: 92%; max-width: 900px; max-height: 90vh; overflow-y: auto;
+    padding: 32px; position: relative; animation: slideUp .25s ease;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  }
+  @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .detail-close {
+    position: absolute; top: 16px; right: 20px;
+    background: var(--bg); border: 1px solid var(--border); color: var(--text-dim);
+    font-size: 20px; cursor: pointer; line-height: 1; padding: 4px 12px;
+    border-radius: 6px; transition: all .15s;
+  }
+  .detail-close:hover { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+
+  .detail-panel h2 { font-size: 24px; margin-bottom: 16px; }
+  .detail-panel .info-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px; margin-bottom: 24px;
+  }
+  .detail-panel .info-item {
+    background: var(--bg); border-radius: 8px; padding: 12px 14px; border: 1px solid var(--border);
+  }
+  .detail-panel .info-item .ilabel { font-size: 11px; color: var(--text-dim); }
+  .detail-panel .info-item .ivalue { font-size: 14px; font-weight: 600; margin-top: 3px; }
+
+  .file-list { max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .file-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px; font-size: 13px; border-bottom: 1px solid #f0f2f5;
+  }
+  .file-item:last-child { border-bottom: none; }
+  .file-item:hover { background: #f7fafc; }
+  .file-item .fcount { font-weight: 600; color: var(--red); }
+
+  .back-btn {
+    background: var(--accent); border: none; color: #fff; padding: 10px 24px;
+    border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: all .2s;
+  }
+  .back-btn:hover { background: #2c5282; }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 3px; }
+
+  @media (max-width: 640px) {
+    .container { padding: 16px; }
+    .latest-pr-card .info-grid { grid-template-columns: 1fr 1fr; }
+    .module-stats { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>Pre-Commit <span>静态检查看板</span></h1>
+    <div class="sub" id="headerSub">Jenkins CI 代码格式检查 · 问题发现与清理建议</div>
+  </div>
+
+  <div class="repo-tabs" id="repoTabs"></div>
+
+  <div id="latestPRCard"></div>
+
+  <div id="suggestionArea"></div>
+
+  <div class="section" id="moduleSection">
+    <h3>📁 问题统计 <span class="badge" id="moduleCount">0</span></h3>
+    <div class="module-list" id="moduleList"></div>
+  </div>
+
+  <div class="section">
+    <h3>📋 开启中 PR 检查列表</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>PR</th>
+          <th>作者</th>
+          <th>状态</th>
+          <th>违规数</th>
+          <th>受影响文件</th>
+          <th>主要模块</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="prTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Detail overlay -->
+<div class="detail-overlay" id="detailOverlay">
+  <div class="detail-panel" id="detailPanel"></div>
+</div>
+
+<script>
+const reposData = {
+  "ubs-engine": [
+    {
+      "id": "ubs-engine-6581",
+      "name": "ubs-engine-6581",
+      "repo": "ubs-engine",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#1552",
+      "prAuthor": "davidhwang",
+      "prSource": "fix_rmrs_bad_decision",
+      "trigger": "merge_request",
+      "buildNumber": 7243,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-engine-6580",
+      "name": "ubs-engine-6580",
+      "repo": "ubs-engine",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#1551",
+      "prAuthor": "davidhwang",
+      "prSource": "fix_oc_8_err",
+      "trigger": "merge_request",
+      "buildNumber": 7242,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-engine-6547",
+      "name": "ubs-engine-6547",
+      "repo": "ubs-engine",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#1548",
+      "prAuthor": "zhang_qin_5",
+      "prSource": "3rdparty",
+      "trigger": "merge_request",
+      "buildNumber": 7209,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-engine-6572",
+      "name": "ubs-engine-6572",
+      "repo": "ubs-engine",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#1544",
+      "prAuthor": "lisong_hw",
+      "prSource": "fix-mem",
+      "trigger": "note",
+      "buildNumber": 7234,
+      "status": "fail",
+      "checkType": "clang-format",
+      "violations": 1,
+      "affectedFiles": 1,
+      "srcViolations": 0,
+      "testViolations": 1,
+      "conclusion": "clang-format 检查失败，测试目录占 100% 违规",
+      "recommendation": "重点关注 test (1处)，建议统一运行 clang-format -i 批量修复",
+      "topDirs": [
+        [
+          "test",
+          1,
+          "测试"
+        ]
+      ],
+      "topFiles": [
+        [
+          "test/UT/mem_controller/test_ubse_mem_controller_api.cpp",
+          1
+        ]
+      ],
+      "samples": [
+        "test/UT/mem_controller/test_ubse_mem_controller_api.cpp:17:1: code should be clang-formatted"
+      ],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-engine-6570",
+      "name": "ubs-engine-6570",
+      "repo": "ubs-engine",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#1455",
+      "prAuthor": "fangyuhao",
+      "prSource": "0813type",
+      "trigger": "note",
+      "buildNumber": 7232,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-engine-6545",
+      "name": "ubs-engine-6545",
+      "repo": "ubs-engine",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#1546",
+      "prAuthor": "zhangkun2019",
+      "prSource": "master",
+      "trigger": "merge_request",
+      "buildNumber": 7207,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-engine-6555",
+      "name": "ubs-engine-6555",
+      "repo": "ubs-engine",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#1547",
+      "prAuthor": "bytesliang",
+      "prSource": "fix/ipc-log",
+      "trigger": "note",
+      "buildNumber": 7217,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-engine-6534",
+      "name": "ubs-engine-6534",
+      "repo": "ubs-engine",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#1513",
+      "prAuthor": "xuke--",
+      "prSource": "master",
+      "trigger": "merge_request",
+      "buildNumber": 7196,
+      "status": "skip",
+      "checkType": "未配置 pre-commit",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "仓库未配置 pre-commit 检查",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-engine-6509",
+      "name": "ubs-engine-6509",
+      "repo": "ubs-engine",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#1532",
+      "prAuthor": "will_niutao",
+      "prSource": "master",
+      "trigger": "note",
+      "buildNumber": 7171,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-engine-no-build-1499",
+      "name": "ubs-engine-no-build-1499",
+      "repo": "ubs-engine",
+      "branch": "",
+      "targetBranch": "",
+      "pr": "#1499",
+      "prAuthor": "ryaninvoker512",
+      "prSource": "-",
+      "trigger": "-",
+      "buildNumber": 0,
+      "status": "skip",
+      "checkType": "无检查记录",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "该 PR 尚无 Jenkins pre-commit 检查记录",
+      "recommendation": "等待 Jenkins pre-commit 任务执行检查",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    }
+  ],
+  "ubs-comm": [
+    {
+      "id": "ubs-comm-2511",
+      "name": "ubs-comm-2511",
+      "repo": "ubs-comm",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#1068",
+      "prAuthor": "panhengzhi",
+      "prSource": "mem-pool-tls-cache-switch",
+      "trigger": "merge_request",
+      "buildNumber": 4201,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-comm-2509",
+      "name": "ubs-comm-2509",
+      "repo": "ubs-comm",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#1074",
+      "prAuthor": "hemiao3787",
+      "prSource": "workmaster",
+      "trigger": "merge_request",
+      "buildNumber": 4199,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-comm-2506",
+      "name": "ubs-comm-2506",
+      "repo": "ubs-comm",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#1067",
+      "prAuthor": "will_niutao",
+      "prSource": "master",
+      "trigger": "note",
+      "buildNumber": 4196,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-comm-2504",
+      "name": "ubs-comm-2504",
+      "repo": "ubs-comm",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#1070",
+      "prAuthor": "KanPro1",
+      "prSource": "deinitOrder",
+      "trigger": "merge_request",
+      "buildNumber": 4194,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-comm-2482",
+      "name": "ubs-comm-2482",
+      "repo": "ubs-comm",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#1063",
+      "prAuthor": "huangxiaojun",
+      "prSource": "master",
+      "trigger": "note",
+      "buildNumber": 4172,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-comm-no-build-1031",
+      "name": "ubs-comm-no-build-1031",
+      "repo": "ubs-comm",
+      "branch": "",
+      "targetBranch": "",
+      "pr": "#1031",
+      "prAuthor": "wang-shun1999",
+      "prSource": "-",
+      "trigger": "-",
+      "buildNumber": 0,
+      "status": "skip",
+      "checkType": "无检查记录",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "该 PR 尚无 Jenkins pre-commit 检查记录",
+      "recommendation": "等待 Jenkins pre-commit 任务执行检查",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-comm-no-build-1030",
+      "name": "ubs-comm-no-build-1030",
+      "repo": "ubs-comm",
+      "branch": "",
+      "targetBranch": "",
+      "pr": "#1030",
+      "prAuthor": "xiezhh",
+      "prSource": "-",
+      "trigger": "-",
+      "buildNumber": 0,
+      "status": "skip",
+      "checkType": "无检查记录",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "该 PR 尚无 Jenkins pre-commit 检查记录",
+      "recommendation": "等待 Jenkins pre-commit 任务执行检查",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-comm-no-build-1029",
+      "name": "ubs-comm-no-build-1029",
+      "repo": "ubs-comm",
+      "branch": "",
+      "targetBranch": "",
+      "pr": "#1029",
+      "prAuthor": "songrui42",
+      "prSource": "-",
+      "trigger": "-",
+      "buildNumber": 0,
+      "status": "skip",
+      "checkType": "无检查记录",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "该 PR 尚无 Jenkins pre-commit 检查记录",
+      "recommendation": "等待 Jenkins pre-commit 任务执行检查",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-comm-no-build-1027",
+      "name": "ubs-comm-no-build-1027",
+      "repo": "ubs-comm",
+      "branch": "",
+      "targetBranch": "",
+      "pr": "#1027",
+      "prAuthor": "fuziye",
+      "prSource": "-",
+      "trigger": "-",
+      "buildNumber": 0,
+      "status": "skip",
+      "checkType": "无检查记录",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "该 PR 尚无 Jenkins pre-commit 检查记录",
+      "recommendation": "等待 Jenkins pre-commit 任务执行检查",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-comm-no-build-1022",
+      "name": "ubs-comm-no-build-1022",
+      "repo": "ubs-comm",
+      "branch": "",
+      "targetBranch": "",
+      "pr": "#1022",
+      "prAuthor": "qlotte",
+      "prSource": "-",
+      "trigger": "-",
+      "buildNumber": 0,
+      "status": "skip",
+      "checkType": "无检查记录",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "该 PR 尚无 Jenkins pre-commit 检查记录",
+      "recommendation": "等待 Jenkins pre-commit 任务执行检查",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    }
+  ],
+  "ubs-io": [
+    {
+      "id": "ubs-io-887",
+      "name": "ubs-io-887",
+      "repo": "ubs-io",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#290",
+      "prAuthor": "gcw_Nt0RibX4",
+      "prSource": "fix_memleak",
+      "trigger": "note",
+      "buildNumber": 1079,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-io-886",
+      "name": "ubs-io-886",
+      "repo": "ubs-io",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#291",
+      "prAuthor": "gcw_Nt0RibX4",
+      "prSource": "fix_nullpoint",
+      "trigger": "note",
+      "buildNumber": 1078,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-io-885",
+      "name": "ubs-io-885",
+      "repo": "ubs-io",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#281",
+      "prAuthor": "will_niutao",
+      "prSource": "master",
+      "trigger": "note",
+      "buildNumber": 1077,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-io-852",
+      "name": "ubs-io-852",
+      "repo": "ubs-io",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#270",
+      "prAuthor": "huangxiaojun",
+      "prSource": "master",
+      "trigger": "note",
+      "buildNumber": 1044,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    }
+  ],
+  "ubs-mem": [
+    {
+      "id": "ubs-mem-348",
+      "name": "ubs-mem-348",
+      "repo": "ubs-mem",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#89",
+      "prAuthor": "gcw_Nt0RibX4",
+      "prSource": "fix_bug",
+      "trigger": "merge_request",
+      "buildNumber": 407,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-mem-347",
+      "name": "ubs-mem-347",
+      "repo": "ubs-mem",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#88",
+      "prAuthor": "yangqi12138",
+      "prSource": "example/contiguous-shmem",
+      "trigger": "note",
+      "buildNumber": 406,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-mem-346",
+      "name": "ubs-mem-346",
+      "repo": "ubs-mem",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#85",
+      "prAuthor": "whytao",
+      "prSource": "master",
+      "trigger": "merge_request",
+      "buildNumber": 405,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-mem-345",
+      "name": "ubs-mem-345",
+      "repo": "ubs-mem",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#87",
+      "prAuthor": "will_niutao",
+      "prSource": "master",
+      "trigger": "note",
+      "buildNumber": 404,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-mem-329",
+      "name": "ubs-mem-329",
+      "repo": "ubs-mem",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#83",
+      "prAuthor": "sunyunyu",
+      "prSource": "readme-lang-switch-20260824201414-9b48f117",
+      "trigger": "merge_request",
+      "buildNumber": 388,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    }
+  ],
+  "ubs-virt": [
+    {
+      "id": "ubs-virt-482",
+      "name": "ubs-virt-482",
+      "repo": "ubs-virt",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#238",
+      "prAuthor": "xuke--",
+      "prSource": "master",
+      "trigger": "merge_request",
+      "buildNumber": 1285,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-virt-470",
+      "name": "ubs-virt-470",
+      "repo": "ubs-virt",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#235",
+      "prAuthor": "huangxiaojun",
+      "prSource": "master",
+      "trigger": "note",
+      "buildNumber": 1273,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-virt-no-build-206",
+      "name": "ubs-virt-no-build-206",
+      "repo": "ubs-virt",
+      "branch": "",
+      "targetBranch": "",
+      "pr": "#206",
+      "prAuthor": "luoyikang",
+      "prSource": "-",
+      "trigger": "-",
+      "buildNumber": 0,
+      "status": "skip",
+      "checkType": "无检查记录",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "该 PR 尚无 Jenkins pre-commit 检查记录",
+      "recommendation": "等待 Jenkins pre-commit 任务执行检查",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-virt-no-build-185",
+      "name": "ubs-virt-no-build-185",
+      "repo": "ubs-virt",
+      "branch": "",
+      "targetBranch": "",
+      "pr": "#185",
+      "prAuthor": "julyfish",
+      "prSource": "-",
+      "trigger": "-",
+      "buildNumber": 0,
+      "status": "skip",
+      "checkType": "无检查记录",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "该 PR 尚无 Jenkins pre-commit 检查记录",
+      "recommendation": "等待 Jenkins pre-commit 任务执行检查",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    }
+  ],
+  "ubturbo": [
+    {
+      "id": "ubturbo-1501",
+      "name": "ubturbo-1501",
+      "repo": "ubturbo",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#419",
+      "prAuthor": "caojinyu___",
+      "prSource": "master",
+      "trigger": "note",
+      "buildNumber": 2136,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubturbo-1486",
+      "name": "ubturbo-1486",
+      "repo": "ubturbo",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#416",
+      "prAuthor": "hemiao3787",
+      "prSource": "workmaster",
+      "trigger": "merge_request",
+      "buildNumber": 2121,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubturbo-1484",
+      "name": "ubturbo-1484",
+      "repo": "ubturbo",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#412",
+      "prAuthor": "lisong_hw",
+      "prSource": "master",
+      "trigger": "note",
+      "buildNumber": 2119,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubturbo-1468",
+      "name": "ubturbo-1468",
+      "repo": "ubturbo",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#410",
+      "prAuthor": "will_niutao",
+      "prSource": "master",
+      "trigger": "note",
+      "buildNumber": 2103,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubturbo-1459",
+      "name": "ubturbo-1459",
+      "repo": "ubturbo",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#413",
+      "prAuthor": "crawlerLi",
+      "prSource": "master",
+      "trigger": "merge_request",
+      "buildNumber": 2094,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubturbo-no-build-389",
+      "name": "ubturbo-no-build-389",
+      "repo": "ubturbo",
+      "branch": "",
+      "targetBranch": "",
+      "pr": "#389",
+      "prAuthor": "yuyuanxun",
+      "prSource": "-",
+      "trigger": "-",
+      "buildNumber": 0,
+      "status": "skip",
+      "checkType": "无检查记录",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "该 PR 尚无 Jenkins pre-commit 检查记录",
+      "recommendation": "等待 Jenkins pre-commit 任务执行检查",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubturbo-no-build-372",
+      "name": "ubturbo-no-build-372",
+      "repo": "ubturbo",
+      "branch": "",
+      "targetBranch": "",
+      "pr": "#372",
+      "prAuthor": "huangxiaojun",
+      "prSource": "-",
+      "trigger": "-",
+      "buildNumber": 0,
+      "status": "skip",
+      "checkType": "无检查记录",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "该 PR 尚无 Jenkins pre-commit 检查记录",
+      "recommendation": "等待 Jenkins pre-commit 任务执行检查",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubturbo-no-build-375",
+      "name": "ubturbo-no-build-375",
+      "repo": "ubturbo",
+      "branch": "",
+      "targetBranch": "",
+      "pr": "#375",
+      "prAuthor": "dszhu",
+      "prSource": "-",
+      "trigger": "-",
+      "buildNumber": 0,
+      "status": "skip",
+      "checkType": "无检查记录",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "该 PR 尚无 Jenkins pre-commit 检查记录",
+      "recommendation": "等待 Jenkins pre-commit 任务执行检查",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubturbo-no-build-332",
+      "name": "ubturbo-no-build-332",
+      "repo": "ubturbo",
+      "branch": "",
+      "targetBranch": "",
+      "pr": "#332",
+      "prAuthor": "subceux",
+      "prSource": "-",
+      "trigger": "-",
+      "buildNumber": 0,
+      "status": "skip",
+      "checkType": "无检查记录",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "该 PR 尚无 Jenkins pre-commit 检查记录",
+      "recommendation": "等待 Jenkins pre-commit 任务执行检查",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubturbo-no-build-326",
+      "name": "ubturbo-no-build-326",
+      "repo": "ubturbo",
+      "branch": "",
+      "targetBranch": "",
+      "pr": "#326",
+      "prAuthor": "davidhwang",
+      "prSource": "-",
+      "trigger": "-",
+      "buildNumber": 0,
+      "status": "skip",
+      "checkType": "无检查记录",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "该 PR 尚无 Jenkins pre-commit 检查记录",
+      "recommendation": "等待 Jenkins pre-commit 任务执行检查",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    }
+  ],
+  "ham": [
+    {
+      "id": "ham-19",
+      "name": "ham-19",
+      "repo": "ham",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#15",
+      "prAuthor": "huangxiaojun",
+      "prSource": "master",
+      "trigger": "note",
+      "buildNumber": 32,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ham-14",
+      "name": "ham-14",
+      "repo": "ham",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#16",
+      "prAuthor": "sunyunyu",
+      "prSource": "readme-lang-switch-20260824200621-79909ac3",
+      "trigger": "merge_request",
+      "buildNumber": 27,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    }
+  ],
+  "OmniStateStore": [
+    {
+      "id": "OmniStateStore-no-build-117",
+      "name": "OmniStateStore-no-build-117",
+      "repo": "OmniStateStore",
+      "branch": "",
+      "targetBranch": "",
+      "pr": "#117",
+      "prAuthor": "huangxiaojun",
+      "prSource": "-",
+      "trigger": "-",
+      "buildNumber": 0,
+      "status": "skip",
+      "checkType": "无检查记录",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "该 PR 尚无 Jenkins pre-commit 检查记录",
+      "recommendation": "等待 Jenkins pre-commit 任务执行检查",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    }
+  ],
+  "ubs-atomic": [
+    {
+      "id": "ubs-atomic-116",
+      "name": "ubs-atomic-116",
+      "repo": "ubs-atomic",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#63",
+      "prAuthor": "Chenfeng_Xie",
+      "prSource": "ubs-atomic-installation",
+      "trigger": "merge_request",
+      "buildNumber": 167,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-atomic-115",
+      "name": "ubs-atomic-115",
+      "repo": "ubs-atomic",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#62",
+      "prAuthor": "huangxiaojun",
+      "prSource": "master",
+      "trigger": "note",
+      "buildNumber": 166,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-atomic-114",
+      "name": "ubs-atomic-114",
+      "repo": "ubs-atomic",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#61",
+      "prAuthor": "davidhwang",
+      "prSource": "fix_3rdparty",
+      "trigger": "note",
+      "buildNumber": 165,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    },
+    {
+      "id": "ubs-atomic-113",
+      "name": "ubs-atomic-113",
+      "repo": "ubs-atomic",
+      "branch": "master",
+      "targetBranch": "master",
+      "pr": "#57",
+      "prAuthor": "davidhwang",
+      "prSource": "add_tx_res_testcase",
+      "trigger": "merge_request",
+      "buildNumber": 164,
+      "status": "pass",
+      "checkType": "clang-format",
+      "violations": 0,
+      "affectedFiles": 0,
+      "srcViolations": 0,
+      "testViolations": 0,
+      "conclusion": "",
+      "recommendation": "",
+      "topDirs": [],
+      "topFiles": [],
+      "samples": [],
+      "merged_at": ""
+    }
+  ]
+};
+let currentRepo = null;
+let components = [];
+
+function switchRepo(repoName) {
+  currentRepo = repoName;
+  components = reposData[repoName] || [];
+
+  // Update tab styles
+  document.querySelectorAll('.repo-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('[data-repo="'+repoName+'"]').classList.add('active');
+
+  // Update header
+  const failedPRs = components.filter(c => c.status === 'fail').length;
+  document.getElementById('headerSub').innerHTML =
+    '<strong>'+repoName+'</strong> · 最新 '+components.length+' 条开启中 PR · ' +
+    (failedPRs > 0 ? '<span style="color:var(--red);font-weight:600;">'+failedPRs+' 个 PR 待修复</span>' : '<span style="color:var(--green);font-weight:600;">所有检查正常</span>');
+
+  render();
+}
+
+function render() {
+  // Render repo tabs first (on first load)
+  if (!currentRepo) {
+    const repoNames = Object.keys(reposData);
+    if (repoNames.length === 0) return;
+    currentRepo = repoNames[0];
+    document.getElementById('repoTabs').innerHTML = repoNames.map(name => {
+      const failed = (reposData[name] || []).filter(c => c.status === 'fail').length;
+      return '<button class="repo-tab" data-repo="'+name+'" onclick="switchRepo(\x27'+name+'\x27)">' +
+        name + (failed > 0 ? '<span class="badge">'+failed+'</span>' : '') + '</button>';
+    }).join('');
+    switchRepo(currentRepo);
+    return;
+  }
+
+  // Get the latest (first) open PR
+  const latestPR = components.length > 0 ? components[0] : null;
+
+  // Render latest PR card
+  const latestPRCard = document.getElementById('latestPRCard');
+  if (latestPR) {
+    const prNum = latestPR.pr.replace('#', '');
+    const prUrl = 'https://gitcode.com/openeuler/'+latestPR.repo+'/pull/'+prNum;
+    const statusLabel = latestPR.status === 'fail' ? '失败' : latestPR.status === 'pass' ? '通过' : '跳过';
+    const statusClass = latestPR.status;
+
+    let infoHtml = '<div class="info-grid">' +
+      '<div class="info-item"><div class="ilabel">仓库</div><div class="ivalue">'+latestPR.repo+'</div></div>' +
+      '<div class="info-item"><div class="ilabel">作者</div><div class="ivalue">'+latestPR.prAuthor+'</div></div>' +
+      '<div class="info-item"><div class="ilabel">分支</div><div class="ivalue">'+latestPR.branch+'</div></div>' +
+      '<div class="info-item"><div class="ilabel">检查类型</div><div class="ivalue">'+latestPR.checkType+'</div></div>' +
+      '<div class="info-item"><div class="ilabel">检查状态</div><div class="ivalue '+statusClass+'">'+statusLabel+'</div></div>';
+
+    if (latestPR.status === 'fail') {
+      infoHtml += '<div class="info-item"><div class="ilabel">违规数</div><div class="ivalue red">'+latestPR.violations.toLocaleString()+'</div></div>' +
+        '<div class="info-item"><div class="ilabel">受影响文件</div><div class="ivalue red">'+latestPR.affectedFiles+'</div></div>';
+    }
+    infoHtml += '</div>';
+
+    let conclusionHtml = '';
+    if (latestPR.conclusion) {
+      conclusionHtml = '<div class="conclusion '+latestPR.status+'">'+latestPR.conclusion+'</div>';
+    }
+
+    latestPRCard.innerHTML =
+      '<div class="latest-pr-card">' +
+      '<div class="card-header">' +
+      '<div class="card-title">📌 最新开启中 PR 检查简介</div>' +
+      '<div class="pr-id"><a href="'+prUrl+'" target="_blank">PR #'+prNum+'</a></div>' +
+      '</div>' +
+      infoHtml + conclusionHtml +
+      '</div>';
+  } else {
+    latestPRCard.innerHTML =
+      '<div class="latest-pr-card"><div class="no-data">暂无开启中的 PR 检查数据</div></div>';
+  }
+
+  // Module stats - based on latest PR only
+  const moduleMap = {};
+  if (latestPR && latestPR.topDirs) {
+    latestPR.topDirs.forEach(d => {
+      moduleMap[d[0]] = { name: d[0], violations: d[1], desc: d[2] };
+    });
+  }
+  const modules = Object.values(moduleMap).sort((a, b) => b.violations - a.violations);
+
+  // Module section
+  const moduleSection = document.getElementById('moduleSection');
+  if (modules.length > 0) {
+    document.getElementById('moduleCount').textContent = modules.length;
+    moduleSection.style.display = 'block';
+    document.getElementById('moduleList').innerHTML = modules.map((m, idx) => {
+      const priority = idx === 0 ? 'P0' : idx <= 2 ? 'P1' : 'P2';
+      const pClass = idx === 0 ? 'priority-p0' : idx <= 2 ? 'priority-p1' : 'priority-p2';
+      return '<div class="module-item">' +
+        '<span class="module-name">'+m.name+' <span style="color:var(--text-dim);font-size:12px;">('+m.desc+')</span>' +
+        '<span class="priority-tag '+pClass+'">'+priority+'</span></span>' +
+        '<div class="module-stats">' +
+        '<span class="module-stat"><span class="label">违规数:</span> <span class="value high">'+m.violations.toLocaleString()+'</span></span>' +
+        '</div></div>';
+    }).join('');
+  } else {
+    moduleSection.style.display = 'none';
+  }
+
+  // Suggestions - based on latest PR only
+  const suggestionArea = document.getElementById('suggestionArea');
+  if (latestPR && latestPR.status === 'fail' && modules.length > 0) {
+    const prNum = latestPR.pr.replace('#', '');
+    const topModules = modules.slice(0, 3).map(m => '<code>'+m.name+'</code>').join('、');
+    suggestionArea.innerHTML =
+      '<div class="suggestion-card">' +
+      '<h3>💡 清理建议 (PR #'+prNum+')</h3>' +
+      '<ol>' +
+      '<li><strong>按优先级修复:</strong> 建议按 P0→P1→P2 的顺序处理模块，优先解决 '+topModules+' 等重灾区</li>' +
+      '<li><strong>修复命令:</strong> 本地执行 <code>git-clang-format --style=file --commit HEAD~1</code> 格式化本次变更</li>' +
+      '<li><strong>全量修复:</strong> 对历史遗留问题，可安排专项任务统一执行 <code>find . -name "*.cpp" -o -name "*.h" | xargs clang-format -i</code></li>' +
+      '<li><strong>防止新增:</strong> 确保本地配置 pre-commit 钩子，提交前自动格式化，避免把问题带入 CI</li>' +
+      '</ol>' +
+      '</div>';
+  } else if (latestPR && latestPR.status === 'skip') {
+    suggestionArea.innerHTML =
+      '<div class="suggestion-card">' +
+      '<h3>💡 启用建议</h3>' +
+      '<ol>' +
+      '<li><strong>添加配置:</strong> 在仓库根目录创建 <code>.pre-commit-config.yaml</code>，配置 clang-format 钩子</li>' +
+      '<li><strong>本地安装:</strong> 开发者执行 <code>pip install pre-commit && pre-commit install</code> 启用本地检查</li>' +
+      '<li><strong>CI 集成:</strong> 确保 Jenkins OpenSourceCodeCheck 任务已启用该仓库的检查</li>' +
+      '</ol>' +
+      '</div>';
+  } else {
+    suggestionArea.innerHTML = '';
+  }
+
+  // PR table - sort by violations descending
+  const failedComps = components.filter(c => c.status === 'fail').sort((a, b) => b.violations - a.violations);
+  const otherComps = components.filter(c => c.status !== 'fail');
+  const sortedComps = [...failedComps, ...otherComps];
+
+  document.getElementById('prTable').innerHTML = sortedComps.map(c => {
+    const modules = c.topDirs ? c.topDirs.slice(0, 3).map(d => '<span>'+d[0]+'</span>').join('') : '-';
+    const vClass = c.violations > 0 ? 'violation-count' : 'violation-count zero';
+    return '<tr>'+
+      '<td><a href="https://gitcode.com/openeuler/'+c.repo+'/pull/'+c.pr.replace('#','')+'" target="_blank" class="pr-link">'+c.pr+'</a></td>'+
+      '<td>'+c.prAuthor+'</td>'+
+      '<td><span class="badge '+c.status+'">'+(c.status==='fail'?'失败':c.status==='pass'?'通过':'跳过')+'</span></td>'+
+      '<td class="'+vClass+'">'+c.violations.toLocaleString()+'</td>'+
+      '<td>'+c.affectedFiles+'</td>'+
+      '<td class="top-modules">'+(modules || '-')+'</td>'+
+      '<td><button onclick="openDetail(\x27'+c.id+'\x27)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;">查看详情 &rarr;</button></td>'+
+      '</tr>';
+  }).join('');
+}
+
+function openDetail(id) {
+  var c = components.find(function(x){return x.id===id;});
+  if(!c) return;
+
+  var body = '<button class="detail-close" onclick="closeDetail()">&times;</button>';
+  body += '<h2>PR '+c.pr+' 检查详情</h2>';
+  body += '<div class="info-grid">'+
+    '<div class="info-item"><div class="ilabel">仓库</div><div class="ivalue">'+c.repo+'</div></div>'+
+    '<div class="info-item"><div class="ilabel">作者</div><div class="ivalue">'+c.prAuthor+'</div></div>'+
+    '<div class="info-item"><div class="ilabel">分支</div><div class="ivalue">'+c.branch+'</div></div>'+
+    '<div class="info-item"><div class="ilabel">检查类型</div><div class="ivalue">'+c.checkType+'</div></div>'+
+    '<div class="info-item"><div class="ilabel">触发方式</div><div class="ivalue">'+c.trigger+'</div></div></div>';
+
+  if(c.status==='fail'){
+    body += '<div class="section" style="margin:20px 0;"><h3>📊 检查结果</h3><div class="info-grid">'+
+      '<div class="info-item"><div class="ilabel">总违规数</div><div class="ivalue" style="color:var(--red);font-size:24px;">'+c.violations.toLocaleString()+'</div></div>'+
+      '<div class="info-item"><div class="ilabel">受影响文件</div><div class="ivalue" style="font-size:24px;">'+c.affectedFiles+'</div></div>'+
+      '<div class="info-item"><div class="ilabel">src 目录</div><div class="ivalue">'+c.srcViolations.toLocaleString()+'</div></div>'+
+      '<div class="info-item"><div class="ilabel">test 目录</div><div class="ivalue">'+c.testViolations.toLocaleString()+'</div></div></div></div>';
+
+    if(c.topDirs && c.topDirs.length > 0) {
+      body += '<div class="section" style="margin:20px 0;"><h3>📁 违规模块全览 <span class="badge">'+c.topDirs.length+'</span></h3><div class="file-list">';
+      body += c.topDirs.map(d =>
+        '<div class="file-item"><span class="fpath">'+d[0]+' <span style="color:var(--text-dim);font-size:11px;">('+d[2]+')</span></span><span class="fcount">'+d[1].toLocaleString()+'</span></div>'
+      ).join('');
+      body += '</div></div>';
+    }
+
+    if(c.topFiles && c.topFiles.length > 0) {
+      body += '<div class="section" style="margin:20px 0;"><h3>📄 违规文件全览 <span class="badge">'+c.topFiles.length+'</span></h3><div class="file-list">';
+      body += c.topFiles.map(f =>
+        '<div class="file-item"><span class="fpath">'+f[0]+'</span><span class="fcount">'+f[1]+'</span></div>'
+      ).join('');
+      body += '</div></div>';
+    }
+
+    body += '<div class="section" style="margin:20px 0;"><h3>💡 修复建议</h3><div class="action-card" style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;padding:16px;">'+c.recommendation+'</div></div>';
+  }
+
+  if(c.status==='skip'){
+    body += '<div class="section" style="margin:20px 0;"><h3>ℹ️ 说明</h3><div class="action-card" style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;">'+c.conclusion+'<br><br><strong>建议:</strong> '+c.recommendation+'</div></div>';
+  }
+
+  body += '<div style="margin-top:24px;"><button class="back-btn" onclick="closeDetail()">&larr; 返回</button></div>';
+
+  document.getElementById('detailPanel').innerHTML = body;
+  document.getElementById('detailOverlay').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDetail(){
+  document.getElementById('detailOverlay').classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('detailOverlay').addEventListener('click',function(e){if(e.target===this)closeDetail();});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeDetail();});
+
+render();
+</script>
+</body>
+</html>

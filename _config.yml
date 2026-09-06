@@ -1,0 +1,15 @@
+title: Pre-Commit 静态检查看板
+description: openEuler UBSCore 代码格式检查监控平台
+theme: minima
+baseurl: "/monitor_board"
+
+# 导航栏
+header_pages:
+  - index.md
+
+# 配置 markdown
+markdown: kramdown
+
+# 允许 HTML
+kramdown:
+  parse_block_html: true
